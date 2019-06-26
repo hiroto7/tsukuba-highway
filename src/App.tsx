@@ -13,11 +13,11 @@ interface SPARQLQueryResults<V extends string = never, W extends string = never>
   }
 }
 
-type RDFTerm = { "type": "uri", "value": string }
-  | { "type": "literal", "value": string }
-  | { "type": "literal", "value": string, "xml:lang": string }
-  | { "type": "literal", "value": string, "datatype": string }
-  | { "type": "bnode", "value": string }
+type RDFTerm = { type: "uri", value: string }
+  | { type: "literal", value: string }
+  | { type: "literal", value: string, "xml:lang": string }
+  | { type: "literal", value: string, datatype: string }
+  | { type: "bnode", value: string }
 type Binding<V extends string = never, W extends string = never> = { [P in V]: RDFTerm; } & { [P in W]?: RDFTerm; }
 
 interface Point {
@@ -45,7 +45,7 @@ export default class App extends React.Component<{}, {
 }> {
   constructor(props: {}) {
     super(props);
-    this.state = { isLoading: false, roadNames: [], road: null, map: { zoom: 13, center: { lat: 36.0824938, lng: 140.0958208 } } };
+    this.state = { isLoading: false, roadNames: null, road: null, map: { zoom: 13, center: { lat: 36.0824938, lng: 140.0958208 } } };
   }
 
   componentDidMount() {
@@ -66,14 +66,24 @@ select distinct * where {
       const response = await fetch(`${endpoint}?query=${encodeURIComponent(query)}`, { headers: { Accept: 'application/sparql-results+json' } });
       const text = await response.text();
 
-      try {
-        const json: SPARQLQueryResults<'road' | 'roadLabel'> = JSON.parse(text);
-        const roads = json.results.bindings.map(binding => (binding.roadLabel.value));
-        this.setState({ roadNames: roads });
-      } catch (e) {
-        console.error(text);
-        throw e;
-      }
+      const json: SPARQLQueryResults<'road' | 'roadLabel'> = (() => {
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          console.error(text);
+          throw e;
+        }
+      })();
+
+      const roadNames = (() => {
+        try {
+          return json.results.bindings.map(binding => (binding.roadLabel.value));
+        } catch (e) {
+          console.error(json);
+          throw e;
+        }
+      })();
+      this.setState({ roadNames });
     } catch (e) {
       console.error(e);
     } finally {
@@ -157,54 +167,70 @@ select distinct ?start_name ?end_name where {
         return text;
       }));
 
-      try {
-        const jsons = texts.map(text => JSON.parse(text)) as [
+      const jsons = texts.map(text => {
+        try {
+          return JSON.parse(text)
+        } catch (e) {
+          console.error(text);
+          throw e;
+        }
+      }) as [
           SPARQLQueryResults<'start_lng' | 'start_lat' | 'end_lng' | 'end_lat' | 'length' | 'route' | 'lanes_count'>,
           SPARQLQueryResults<'start_name' | 'end_name'>
         ];
 
-        const start: Point = {
-          coordinate: {
-            lat: +jsons[0].results.bindings[0].start_lat.value,
-            lng: +jsons[0].results.bindings[0].start_lng.value
-          },
-          names: new Set(jsons[1].results.bindings.map(binding => binding.start_name.value))
-        }
-        const end: Point = {
-          coordinate: {
-            lat: +jsons[0].results.bindings[0].end_lat.value,
-            lng: +jsons[0].results.bindings[0].end_lng.value
-          },
-          names: new Set(jsons[1].results.bindings.map(binding => binding.end_name.value))
-        }
-
-        const length = +jsons[0].results.bindings[0].length.value;
-        const routeURI = jsons[0].results.bindings[0].route.value;
-        const lanesCounts = new Set(jsons[0].results.bindings.map(binding => +binding.lanes_count.value));
-
-        const response = await fetch(routeURI);
-        const text = await response.text();
-        const route = JSON.parse(text);
-
-        this.setState({
-          road: {
-            name: roadName,
-            route, length, lanesCounts, start, end
-          },
-          map: {
-            ...this.state.map,
-            center: {
-              lat: (start.coordinate.lat + end.coordinate.lat) / 2,
-              lng: (start.coordinate.lng + end.coordinate.lng) / 2
-            }
+      const { length, lanesCounts, start, end, routeURI } = (() => {
+        try {
+          const start: Point = {
+            coordinate: {
+              lat: +jsons[0].results.bindings[0].start_lat.value,
+              lng: +jsons[0].results.bindings[0].start_lng.value
+            },
+            names: new Set(jsons[1].results.bindings.map(binding => binding.start_name.value))
           }
-        });
+          const end: Point = {
+            coordinate: {
+              lat: +jsons[0].results.bindings[0].end_lat.value,
+              lng: +jsons[0].results.bindings[0].end_lng.value
+            },
+            names: new Set(jsons[1].results.bindings.map(binding => binding.end_name.value))
+          }
 
-      } catch (e) {
-        console.error(texts);
-        throw e;
-      }
+          const length = +jsons[0].results.bindings[0].length.value;
+          const routeURI = jsons[0].results.bindings[0].route.value;
+          const lanesCounts = new Set(jsons[0].results.bindings.map(binding => +binding.lanes_count.value));
 
+          return { length, lanesCounts, start, end, routeURI };
+        } catch (e) {
+          console.error(jsons[0], jsons[1]);
+          throw e;
+        }
+      })();
+
+      const response = await fetch(routeURI);
+      const text = await response.text();
+      const route = (() => {
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          console.error(text);
+          throw e;
+        }
+      })();
+
+      this.setState({
+        road: {
+          name: roadName,
+          route, length, lanesCounts, start, end
+        },
+        map: {
+          ...this.state.map,
+          center: {
+            lat: (start.coordinate.lat + end.coordinate.lat) / 2,
+            lng: (start.coordinate.lng + end.coordinate.lng) / 2
+          }
+        }
+      });
     } catch (e) {
       console.error(e);
     } finally {
@@ -287,7 +313,7 @@ select distinct ?start_name ?end_name where {
                     </Popup>
                   </Marker>
 
-                  <GeoJSON key={this.state.road.name} data={this.state.road.route} />
+                  <GeoJSON key={this.state.road.name} data={this.state.road.route} style={{ weight: 6 }} />
                 </>
               )
             }
