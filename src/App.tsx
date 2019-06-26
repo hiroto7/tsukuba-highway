@@ -6,10 +6,10 @@ import { Container, Row, Col, Navbar, Card, Spinner, Table } from 'react-bootstr
 import RoadList from './RoadList';
 import L from 'leaflet';
 
-interface SPARQLQueryResults<V extends string = never, W extends string = never> {
-  head: { vars: (V | W)[] },
+interface SPARQLQueryResults<V extends string> {
+  head: { vars: V[] },
   results: {
-    bindings: Binding<V, W>[]
+    bindings: Binding<V>[]
   }
 }
 
@@ -18,7 +18,7 @@ type RDFTerm = { type: "uri", value: string }
   | { type: "literal", value: string, "xml:lang": string }
   | { type: "literal", value: string, datatype: string }
   | { type: "bnode", value: string }
-type Binding<V extends string = never, W extends string = never> = { [P in V]: RDFTerm; } & { [P in W]?: RDFTerm; }
+type Binding<V extends string> = { [P in V]?: RDFTerm; }
 
 interface Point {
   coordinate: { lat: number, lng: number };
@@ -77,7 +77,7 @@ select distinct * where {
 
       const roadNames = (() => {
         try {
-          return json.results.bindings.map(binding => (binding.roadLabel.value));
+          return json.results.bindings.map(binding => (binding.roadLabel!.value));
         } catch (e) {
           console.error(json);
           throw e;
@@ -183,22 +183,22 @@ select distinct ?start_name ?end_name where {
         try {
           const start: Point = {
             coordinate: {
-              lat: +jsons[0].results.bindings[0].start_lat.value,
-              lng: +jsons[0].results.bindings[0].start_lng.value
+              lat: +jsons[0].results.bindings[0].start_lat!.value,
+              lng: +jsons[0].results.bindings[0].start_lng!.value
             },
-            names: new Set(jsons[1].results.bindings.map(binding => binding.start_name.value))
+            names: new Set(jsons[1].results.bindings.map(binding => binding.start_name!.value))
           }
           const end: Point = {
             coordinate: {
-              lat: +jsons[0].results.bindings[0].end_lat.value,
-              lng: +jsons[0].results.bindings[0].end_lng.value
+              lat: +jsons[0].results.bindings[0].end_lat!.value,
+              lng: +jsons[0].results.bindings[0].end_lng!.value
             },
-            names: new Set(jsons[1].results.bindings.map(binding => binding.end_name.value))
+            names: new Set(jsons[1].results.bindings.map(binding => binding.end_name!.value))
           }
 
-          const length = +jsons[0].results.bindings[0].length.value;
-          const routeURI = jsons[0].results.bindings[0].route.value;
-          const lanesCounts = new Set(jsons[0].results.bindings.map(binding => +binding.lanes_count.value));
+          const length = +jsons[0].results.bindings[0].length!.value;
+          const routeURI = jsons[0].results.bindings[0].route!.value;
+          const lanesCounts = new Set(jsons[0].results.bindings.map(binding => +binding.lanes_count!.value));
 
           return { length, lanesCounts, start, end, routeURI };
         } catch (e) {
