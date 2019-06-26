@@ -299,7 +299,7 @@ select distinct ?start_name ?end_name where {
               this.state.road === null || !('start' in this.state.road) ? '' : (
                 <>
                   <Marker position={this.state.road.start.coordinate}>
-                    <Popup>
+                    <Popup key={this.state.road.name}>
                       <h6>起点</h6>
                       {[...this.state.road.start.names].map(name => (<div key={name}>{name}</div>))}
                       <div>{this.state.road.start.coordinate.lat}, {this.state.road.start.coordinate.lng}</div>
@@ -307,7 +307,7 @@ select distinct ?start_name ?end_name where {
                   </Marker>
 
                   <Marker position={this.state.road.end.coordinate}>
-                    <Popup>
+                    <Popup key={this.state.road.name}>
                       <h6>終点</h6>
                       {[...this.state.road.end.names].map(name => (<div key={name}>{name}</div>))}
                       <div>{this.state.road.end.coordinate.lat}, {this.state.road.end.coordinate.lng}</div>
