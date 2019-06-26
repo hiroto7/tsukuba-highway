@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-import { Map, Marker, TileLayer, Popup, ZoomControl } from 'react-leaflet';
+import { Map, Marker, TileLayer, Popup, ZoomControl, GeoJSON } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Container, Row, Col, Navbar, Card, Spinner, Table } from 'react-bootstrap';
 import RoadList from './RoadList';
@@ -35,7 +35,8 @@ export default class App extends React.Component<{}, {
     length: number,
     lanesCounts: Iterable<number>,
     start: Point,
-    end: Point
+    end: Point,
+    route: GeoJSON.GeoJsonObject
   } | null,
   map: {
     zoom: number,
@@ -55,7 +56,7 @@ export default class App extends React.Component<{}, {
     try {
       this.setState({ isLoading: true });
 
-      const query = `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/mylod/property/>
+      const query = `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/property/>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 select distinct * where {
@@ -86,16 +87,17 @@ select distinct * where {
 
       const queries = [
         /* queries[0] */
-        `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/mylod/property/>
+        `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/property/>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 prefix ic: <http://imi.go.jp/ns/core/rdf#>
 
-select distinct ?start_lng ?start_lat ?end_lng ?end_lat ?length ?lanes_count where {
+select distinct ?start_lng ?start_lat ?end_lng ?end_lat ?length ?route ?lanes_count where {
   ?road bp:category "road" ;
     rdfs:label "${roadName}"@ja ;
     bp:起点 ?start ;
     bp:終点 ?end ;
     bp:length ?length ;
+    bp:route ?route ;
     bp:車線数 ?lanes_count .
   {
     ?start ic:経度 ?start_lng .
@@ -126,7 +128,7 @@ select distinct ?start_lng ?start_lat ?end_lng ?end_lat ?length ?lanes_count whe
 } order by desc(?start_priority) desc(?end_priority)`,
 
         /* queries[1] */
-        `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/mylod/property/>
+        `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/property/>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 select distinct ?start_name ?end_name where {
@@ -156,33 +158,38 @@ select distinct ?start_name ?end_name where {
       }));
 
       try {
-        const json = texts.map(text => JSON.parse(text)) as [
-          SPARQLQueryResults<'start_lng' | 'start_lat' | 'end_lng' | 'end_lat' | 'length' | 'lanes_count'>,
+        const jsons = texts.map(text => JSON.parse(text)) as [
+          SPARQLQueryResults<'start_lng' | 'start_lat' | 'end_lng' | 'end_lat' | 'length' | 'route' | 'lanes_count'>,
           SPARQLQueryResults<'start_name' | 'end_name'>
         ];
 
         const start: Point = {
           coordinate: {
-            lat: +json[0].results.bindings[0].start_lat.value,
-            lng: +json[0].results.bindings[0].start_lng.value
+            lat: +jsons[0].results.bindings[0].start_lat.value,
+            lng: +jsons[0].results.bindings[0].start_lng.value
           },
-          names: new Set(json[1].results.bindings.map(binding => binding.start_name.value))
+          names: new Set(jsons[1].results.bindings.map(binding => binding.start_name.value))
         }
         const end: Point = {
           coordinate: {
-            lat: +json[0].results.bindings[0].end_lat.value,
-            lng: +json[0].results.bindings[0].end_lng.value
+            lat: +jsons[0].results.bindings[0].end_lat.value,
+            lng: +jsons[0].results.bindings[0].end_lng.value
           },
-          names: new Set(json[1].results.bindings.map(binding => binding.end_name.value))
+          names: new Set(jsons[1].results.bindings.map(binding => binding.end_name.value))
         }
 
-        const length = +json[0].results.bindings[0].length.value;
-        const lanesCounts = new Set(json[0].results.bindings.map(binding => +binding.lanes_count.value));
+        const length = +jsons[0].results.bindings[0].length.value;
+        const routeURI = jsons[0].results.bindings[0].route.value;
+        const lanesCounts = new Set(jsons[0].results.bindings.map(binding => +binding.lanes_count.value));
+
+        const response = await fetch(routeURI);
+        const text = await response.text();
+        const route = JSON.parse(text);
 
         this.setState({
           road: {
             name: roadName,
-            length, lanesCounts, start, end
+            route, length, lanesCounts, start, end
           },
           map: {
             ...this.state.map,
@@ -192,6 +199,7 @@ select distinct ?start_name ?end_name where {
             }
           }
         });
+
       } catch (e) {
         console.error(texts);
         throw e;
@@ -278,9 +286,12 @@ select distinct ?start_name ?end_name where {
                       <div>{this.state.road.end.coordinate.lat}, {this.state.road.end.coordinate.lng}</div>
                     </Popup>
                   </Marker>
+
+                  <GeoJSON key={this.state.road.name} data={this.state.road.route} />
                 </>
               )
             }
+
           </Map>
         </main>
       </div >
