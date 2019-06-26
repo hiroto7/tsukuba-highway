@@ -287,6 +287,7 @@ select distinct ?start_name ?end_name where {
 
           <Map zoom={this.state.map.zoom} zoomControl={false}
             center={this.state.map.center}
+            maxZoom={18}
             onZoom={({ target }: { target: L.Map }) => this.setState({ map: { ...this.state.map, zoom: target.getZoom() } })}
             onMoveEnd={({ target }: { target: L.Map }) => this.setState({ map: { ...this.state.map, center: target.getCenter() } })}>
             <ZoomControl position="bottomright" />
