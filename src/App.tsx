@@ -4,6 +4,7 @@ import { Map, Marker, TileLayer, Popup, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Container, Row, Col, Navbar, Card, Spinner, Table } from 'react-bootstrap';
 import RoadList from './RoadList';
+import L from 'leaflet';
 
 interface SPARQLQueryResults<V extends string = never, W extends string = never> {
   head: { vars: (V | W)[] },
@@ -20,7 +21,7 @@ type RDFTerm = { "type": "uri", "value": string }
 type Binding<V extends string = never, W extends string = never> = { [P in V]: RDFTerm; } & { [P in W]?: RDFTerm; }
 
 interface Point {
-  coordinate: { latitude: number, longitude: number }
+  coordinate: { lat: number, lng: number };
   names: Iterable<string>;
 }
 
@@ -35,11 +36,15 @@ export default class App extends React.Component<{}, {
     lanesCounts: Iterable<number>,
     start: Point,
     end: Point
-  } | null
+  } | null,
+  map: {
+    zoom: number,
+    center: { lat: number, lng: number }
+  }
 }> {
   constructor(props: {}) {
     super(props);
-    this.state = { isLoading: false, roadNames: [], road: null };
+    this.state = { isLoading: false, roadNames: [], road: null, map: { zoom: 13, center: { lat: 36.0824938, lng: 140.0958208 } } };
   }
 
   componentDidMount() {
@@ -158,15 +163,15 @@ select distinct ?start_name ?end_name where {
 
         const start: Point = {
           coordinate: {
-            latitude: +json[0].results.bindings[0].start_lat.value,
-            longitude: +json[0].results.bindings[0].start_lng.value
+            lat: +json[0].results.bindings[0].start_lat.value,
+            lng: +json[0].results.bindings[0].start_lng.value
           },
           names: new Set(json[1].results.bindings.map(binding => binding.start_name.value))
         }
         const end: Point = {
           coordinate: {
-            latitude: +json[0].results.bindings[0].end_lat.value,
-            longitude: +json[0].results.bindings[0].end_lng.value
+            lat: +json[0].results.bindings[0].end_lat.value,
+            lng: +json[0].results.bindings[0].end_lng.value
           },
           names: new Set(json[1].results.bindings.map(binding => binding.end_name.value))
         }
@@ -178,6 +183,13 @@ select distinct ?start_name ?end_name where {
           road: {
             name: roadName,
             length, lanesCounts, start, end
+          },
+          map: {
+            ...this.state.map,
+            center: {
+              lat: (start.coordinate.lat + end.coordinate.lat) / 2,
+              lng: (start.coordinate.lng + end.coordinate.lng) / 2
+            }
           }
         });
       } catch (e) {
@@ -200,7 +212,7 @@ select distinct ?start_name ?end_name where {
           {this.state.isLoading ? (<Spinner animation="border" variant="primary" />) : ''}
         </Navbar>
         <main>
-          <Container fluid className="mt-3">
+          <Container fluid className="my-3">
             <Row>
               <Col xs={12} sm={6} md={3} xl={2}>{
                 this.state.roadNames === null ? '' : (
@@ -239,7 +251,10 @@ select distinct ?start_name ?end_name where {
             </Row>
           </Container>
 
-          <Map center={[36.0824938, 140.0958208]} zoom={13} zoomControl={false}>
+          <Map zoom={this.state.map.zoom} zoomControl={false}
+            center={this.state.map.center}
+            onZoom={({ target }: { target: L.Map }) => this.setState({ map: { ...this.state.map, zoom: target.getZoom() } })}
+            onMoveEnd={({ target }: { target: L.Map }) => this.setState({ map: { ...this.state.map, center: target.getCenter() } })}>
             <ZoomControl position="bottomright" />
             <TileLayer
               url="https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
@@ -248,19 +263,19 @@ select distinct ?start_name ?end_name where {
             {
               this.state.road === null || !('start' in this.state.road) ? '' : (
                 <>
-                  <Marker position={[this.state.road.start.coordinate.latitude, this.state.road.start.coordinate.longitude]}>
+                  <Marker position={this.state.road.start.coordinate}>
                     <Popup>
                       <h6>起点</h6>
                       {[...this.state.road.start.names].map(name => (<div key={name}>{name}</div>))}
-                      <div>{this.state.road.start.coordinate.latitude}, {this.state.road.start.coordinate.longitude}</div>
+                      <div>{this.state.road.start.coordinate.lat}, {this.state.road.start.coordinate.lng}</div>
                     </Popup>
                   </Marker>
 
-                  <Marker position={[this.state.road.end.coordinate.latitude, this.state.road.end.coordinate.longitude]}>
+                  <Marker position={this.state.road.end.coordinate}>
                     <Popup>
                       <h6>終点</h6>
                       {[...this.state.road.end.names].map(name => (<div key={name}>{name}</div>))}
-                      <div>{this.state.road.end.coordinate.latitude}, {this.state.road.end.coordinate.longitude}</div>
+                      <div>{this.state.road.end.coordinate.lat}, {this.state.road.end.coordinate.lng}</div>
                     </Popup>
                   </Marker>
                 </>

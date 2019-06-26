@@ -5,8 +5,8 @@ const RoadList: React.FC<{ roads: Iterable<string>, selected?: string, onClick: 
   <Card>{
     <ListGroup variant="flush">
       {
-        [...props.roads].map((road: string) => (
-          <ListGroup.Item action active={road === props.selected} key={road} onClick={() => props.onClick(road)}>{road}</ListGroup.Item>
+        [...props.roads].map((roadName: string) => (
+          <ListGroup.Item action active={roadName === props.selected} key={roadName} onClick={() => props.onClick(roadName)}>{roadName}</ListGroup.Item>
         ))
       }
     </ListGroup>
