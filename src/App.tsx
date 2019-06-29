@@ -45,7 +45,15 @@ export default class App extends React.Component<{}, {
 }> {
   constructor(props: {}) {
     super(props);
-    this.state = { isLoading: false, roadNames: null, road: null, map: { zoom: 13, center: { lat: 36.0824938, lng: 140.0958208 } } };
+    this.state = {
+      isLoading: false,
+      roadNames: null,
+      road: null,
+      map: {
+        zoom: 13,
+        center: { lat: 36.0824938, lng: 140.0958208 }
+      }
+    };
   }
 
   componentDidMount() {
@@ -56,13 +64,14 @@ export default class App extends React.Component<{}, {
     try {
       this.setState({ isLoading: true });
 
-      const query = `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/property/>
+      const query = `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/tsukuba-highway/property/>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 select distinct * where {
   ?road bp:category "road" ;
     rdfs:label ?roadLabel .
 }`;
+
       const response = await fetch(`${endpoint}?query=${encodeURIComponent(query)}`, { headers: { Accept: 'application/sparql-results+json' } });
       const text = await response.text();
 
@@ -97,7 +106,7 @@ select distinct * where {
 
       const queries = [
         /* queries[0] */
-        `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/property/>
+        `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/tsukuba-highway/property/>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 prefix ic: <http://imi.go.jp/ns/core/rdf#>
 
@@ -138,7 +147,7 @@ select distinct ?start_lng ?start_lat ?end_lng ?end_lat ?length ?route ?lanes_co
 } order by desc(?start_priority) desc(?end_priority)`,
 
         /* queries[1] */
-        `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/property/>
+        `prefix bp: <http://www.coins.tsukuba.ac.jp/~s1711402/lod/tsukuba-highway/property/>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 select distinct ?start_name ?end_name where {
@@ -161,20 +170,17 @@ select distinct ?start_name ?end_name where {
   }
 }`
       ] as const;
-      const texts = await Promise.all(queries.map(async query => {
+
+      const jsons = await Promise.all(queries.map(async query => {
         const response = await fetch(`${endpoint}?query=${encodeURIComponent(query)}`, { headers: { Accept: 'application/sparql-results+json' } });
         const text = await response.text();
-        return text;
-      }));
-
-      const jsons = texts.map(text => {
         try {
-          return JSON.parse(text)
+          return JSON.parse(text);
         } catch (e) {
           console.error(text);
           throw e;
         }
-      }) as [
+      })) as [
           SPARQLQueryResults<'start_lng' | 'start_lat' | 'end_lng' | 'end_lat' | 'length' | 'route' | 'lanes_count'>,
           SPARQLQueryResults<'start_name' | 'end_name'>
         ];
