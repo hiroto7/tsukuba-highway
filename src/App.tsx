@@ -252,14 +252,14 @@ select distinct ?start_name ?end_name where {
           {this.state.isLoading ? (<Spinner animation="border" variant="primary" />) : ''}
         </Navbar>
         <main>
-          <Container fluid className="my-3">
+          <Container fluid className="mt-4">
             <Row>
-              <Col xs={12} sm={6} md={3} xl={2}>{
+              <Col xs={12} sm={6} md={3} xl={2} className="mb-4">{
                 this.state.roadNames === null ? '' : (
                   <RoadList selected={this.state.road === null ? undefined : this.state.road.name} roads={this.state.roadNames} onClick={roadName => this.getRoadDetails(roadName)} />
                 )
               }</Col>
-              <Col xs={12} sm={6} md={{ span: 4, offset: 5 }} xl={{ span: 3, offset: 7 }}>{
+              <Col xs={12} sm={6} md={{ span: 4, offset: 5 }} xl={{ span: 3, offset: 7 }} className="mb-4">{
                 this.state.road === null ? '' : (
                   <Card>
                     <Card.Header>{this.state.road.name}</Card.Header>
